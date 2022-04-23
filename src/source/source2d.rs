@@ -8,8 +8,8 @@ use bit_set::BitSet;
 
 use bit_vec::BitVec;
 
+use image::imageops::{flip_horizontal, flip_vertical, rotate180, rotate270, rotate90};
 use image::{GenericImage, ImageBuffer, Pixel};
-use image::imageops::{flip_horizontal, flip_vertical, rotate90, rotate180, rotate270};
 
 use ndarray::prelude::*;
 use ndarray::{Array2, ArrayView2, Ix2};
@@ -23,21 +23,16 @@ use rand::Rng;
 use source::Source;
 use wave::State;
 
-
 type RcArray2<A> = RcArray<A, Ix2>;
-
 
 #[derive(Copy, Clone)]
 pub struct Point2(u32, u32);
 
-
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Copy, Clone, Debug)]
 struct Pixel2(u32);
 
-
 #[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
 pub struct Offset2(isize, isize);
-
 
 impl Sub for Point2 {
     type Output = Offset2;
@@ -50,7 +45,6 @@ impl Sub for Point2 {
     }
 }
 
-
 impl Neg for Offset2 {
     type Output = Self;
 
@@ -58,7 +52,6 @@ impl Neg for Offset2 {
         Offset2(-self.0, -self.1)
     }
 }
-
 
 pub struct OverlappingSource2<P> {
     palette: Vec<P>,
@@ -71,7 +64,6 @@ pub struct OverlappingSource2<P> {
 
     n: (usize, usize),
 }
-
 
 pub mod symmetry {
     bitflags! {
@@ -89,25 +81,27 @@ pub mod symmetry {
 }
 use self::symmetry::*;
 
-
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Sample2<P>(RcArray2<P>);
 
-
 impl<P> OverlappingSource2<P>
-    where P: Copy
+where
+    P: Copy,
 {
-    pub fn from_image<I: GenericImage<Pixel = P> + 'static>(img: &I,
-                                                            n: (usize, usize),
-                                                            periodic: (bool, bool),
-                                                            symmetry: Symmetry2)
-                                                            -> Self
-        where P: Pixel + Eq + Hash + 'static
+    pub fn from_image<I: GenericImage<Pixel = P> + 'static>(
+        img: &I,
+        n: (usize, usize),
+        periodic: (bool, bool),
+        symmetry: Symmetry2,
+    ) -> Self
+    where
+        P: Pixel + Eq + Hash + 'static,
     {
         debug!("Generating palette map...");
 
         let palette_set: HashSet<P> = img.pixels().map(|(_, _, p)| p).collect();
-        let palette_map: HashMap<P, Pixel2> = palette_set.into_iter()
+        let palette_map: HashMap<P, Pixel2> = palette_set
+            .into_iter()
             .enumerate()
             .map(|(i, p)| (p, Pixel2(i as u32)))
             .collect();
@@ -157,16 +151,19 @@ impl<P> OverlappingSource2<P>
 
             debug!("Allocating and filling symmetry 2d-arrays...");
 
-            symm_bufs.into_iter()
+            symm_bufs
+                .into_iter()
                 .map(|symm| {
-                    RcArray::from_shape_fn((symm.width() as usize +
-                                            if periodic.0 { n.0 - 1 } else { 0 },
-                                            symm.height() as usize +
-                                            if periodic.1 { n.1 - 1 } else { 0 }),
-                                           |(x, y)| {
-                                               palette_map[symm.get_pixel(x as u32 % symm.width(),
-                                                                          y as u32 % symm.height())]
-                                           })
+                    RcArray::from_shape_fn(
+                        (
+                            symm.width() as usize + if periodic.0 { n.0 - 1 } else { 0 },
+                            symm.height() as usize + if periodic.1 { n.1 - 1 } else { 0 },
+                        ),
+                        |(x, y)| {
+                            palette_map
+                                [symm.get_pixel(x as u32 % symm.width(), y as u32 % symm.height())]
+                        },
+                    )
                 })
                 .collect()
         };
@@ -181,11 +178,12 @@ impl<P> OverlappingSource2<P>
 
         debug!("Symmetry 1: \n{}", symm0str);
 
-        debug!("Generating and deduplicating samples... 8 symmetries, {} samples per symmetry: \
+        debug!(
+            "Generating and deduplicating samples... 8 symmetries, {} samples per symmetry: \
                 {} samples undeduplicated.",
-               sample_buf_size,
-               8 * sample_buf_size);
-
+            sample_buf_size,
+            8 * sample_buf_size
+        );
 
         let (samples, weights) = {
             let mut sample_set = HashMap::new();
@@ -194,8 +192,10 @@ impl<P> OverlappingSource2<P>
                 for i in 0..symmetry.dim().0 - (n.0 - 1) {
                     for j in 0..symmetry.dim().1 - (n.1 - 1) {
                         let mut sample = symmetry.to_shared();
-                        sample.islice(s![i as isize..(i + n.0 as usize) as isize,
-                                         j as isize..(j + n.1 as usize) as isize]);
+                        sample.islice(s![
+                            i as isize..(i + n.0 as usize) as isize,
+                            j as isize..(j + n.1 as usize) as isize
+                        ]);
                         *sample_set.entry(Sample2(sample)).or_insert(0) += 1;
                     }
                 }
@@ -205,7 +205,8 @@ impl<P> OverlappingSource2<P>
 
             let (sample_vec, weight_vec): (Vec<_>, Vec<_>) = sample_set.into_iter().unzip();
 
-            let weights: Vec<_> = weight_vec.into_iter()
+            let weights: Vec<_> = weight_vec
+                .into_iter()
                 .enumerate()
                 .map(|(i, x)| (i, x as f64))
                 .collect();
@@ -226,8 +227,10 @@ impl<P> OverlappingSource2<P>
         //     debug_assert_eq!(sample.dim(), (3, 3));
         // }
 
-        debug!("Generating collision map. {} samples to collide.",
-               samples.len());
+        debug!(
+            "Generating collision map. {} samples to collide.",
+            samples.len()
+        );
 
         let collide = {
             let mut collide = HashMap::new();
@@ -257,14 +260,22 @@ impl<P> OverlappingSource2<P>
 
             for dx in 0..n.0 {
                 for dy in 0..n.1 {
-                    collide.insert(Offset2(dx, dy),
-                                   check_at_offset(n.0 - dx, n.1 - dy, dx, dy, 0, 0));
-                    collide.insert(Offset2(-dx, dy),
-                                   check_at_offset(n.0 - dx, n.1 - dy, 0, dy, dx, 0));
-                    collide.insert(Offset2(dx, -dy),
-                                   check_at_offset(n.0 - dx, n.1 - dy, dx, 0, 0, dy));
-                    collide.insert(Offset2(-dx, -dy),
-                                   check_at_offset(n.0 - dx, n.1 - dy, 0, 0, dx, dy));
+                    collide.insert(
+                        Offset2(dx, dy),
+                        check_at_offset(n.0 - dx, n.1 - dy, dx, dy, 0, 0),
+                    );
+                    collide.insert(
+                        Offset2(-dx, dy),
+                        check_at_offset(n.0 - dx, n.1 - dy, 0, dy, dx, 0),
+                    );
+                    collide.insert(
+                        Offset2(dx, -dy),
+                        check_at_offset(n.0 - dx, n.1 - dy, dx, 0, 0, dy),
+                    );
+                    collide.insert(
+                        Offset2(-dx, -dy),
+                        check_at_offset(n.0 - dx, n.1 - dy, 0, 0, dx, dy),
+                    );
                 }
             }
 
@@ -275,11 +286,12 @@ impl<P> OverlappingSource2<P>
 
         OverlappingSource2 {
             palette: {
-                let mut vec = palette_map.iter().map(|(&p, &px)| (p, px)).collect::<Vec<_>>();
+                let mut vec = palette_map
+                    .iter()
+                    .map(|(&p, &px)| (p, px))
+                    .collect::<Vec<_>>();
                 vec.sort_by_key(|x| x.1);
-                vec.into_iter()
-                    .map(|x| x.0)
-                    .collect()
+                vec.into_iter().map(|x| x.0).collect()
             },
             inverse_palette: palette_map,
             samples: samples,
@@ -289,13 +301,14 @@ impl<P> OverlappingSource2<P>
         }
     }
 
-
-    pub fn from_image_cli<I: GenericImage<Pixel = P> + 'static>(img: &I,
-                                                                n: (usize, usize),
-                                                                periodic: (bool, bool),
-                                                                symmetry: Symmetry2)
-                                                                -> Self
-        where P: Pixel + Eq + Hash + 'static
+    pub fn from_image_cli<I: GenericImage<Pixel = P> + 'static>(
+        img: &I,
+        n: (usize, usize),
+        periodic: (bool, bool),
+        symmetry: Symmetry2,
+    ) -> Self
+    where
+        P: Pixel + Eq + Hash + 'static,
     {
         let mut progress = ProgressBar::new(2);
         progress.message("Deduplicating palette...");
@@ -364,16 +377,19 @@ impl<P> OverlappingSource2<P>
             progress.message("Copying into array...");
             progress.tick();
 
-            symm_bufs.into_iter()
+            symm_bufs
+                .into_iter()
                 .map(|symm| {
-                    let array = RcArray::from_shape_fn((symm.width() as usize +
-                                            if periodic.0 { n.0 - 1 } else { 0 },
-                                            symm.height() as usize +
-                                            if periodic.1 { n.1 - 1 } else { 0 }),
-                                           |(x, y)| {
-                                               palette_map[symm.get_pixel(x as u32 % symm.width(),
-                                                                          y as u32 % symm.height())]
-                                           });
+                    let array = RcArray::from_shape_fn(
+                        (
+                            symm.width() as usize + if periodic.0 { n.0 - 1 } else { 0 },
+                            symm.height() as usize + if periodic.1 { n.1 - 1 } else { 0 },
+                        ),
+                        |(x, y)| {
+                            palette_map
+                                [symm.get_pixel(x as u32 % symm.width(), y as u32 % symm.height())]
+                        },
+                    );
                     progress.inc();
                     array
                 })
@@ -392,8 +408,10 @@ impl<P> OverlappingSource2<P>
                 for i in 0..symmetry.dim().0 - (n.0 - 1) {
                     for j in 0..symmetry.dim().1 - (n.1 - 1) {
                         let mut sample = symmetry.to_shared();
-                        sample.islice(s![i as isize..(i + n.0 as usize) as isize,
-                                         j as isize..(j + n.1 as usize) as isize]);
+                        sample.islice(s![
+                            i as isize..(i + n.0 as usize) as isize,
+                            j as isize..(j + n.1 as usize) as isize
+                        ]);
                         *sample_set.entry(Sample2(sample)).or_insert(0) += 1;
                     }
                 }
@@ -402,7 +420,8 @@ impl<P> OverlappingSource2<P>
 
             let (sample_vec, weight_vec): (Vec<_>, Vec<_>) = sample_set.into_iter().unzip();
 
-            let weights: Vec<_> = weight_vec.into_iter()
+            let weights: Vec<_> = weight_vec
+                .into_iter()
                 .enumerate()
                 .map(|(i, x)| (i, x as f64))
                 .collect();
@@ -443,14 +462,22 @@ impl<P> OverlappingSource2<P>
 
             for dx in 0..n.0 {
                 for dy in 0..n.1 {
-                    collide.insert(Offset2(dx, dy),
-                                   check_at_offset(n.0 - dx, n.1 - dy, dx, dy, 0, 0));
-                    collide.insert(Offset2(-dx, dy),
-                                   check_at_offset(n.0 - dx, n.1 - dy, 0, dy, dx, 0));
-                    collide.insert(Offset2(dx, -dy),
-                                   check_at_offset(n.0 - dx, n.1 - dy, dx, 0, 0, dy));
-                    collide.insert(Offset2(-dx, -dy),
-                                   check_at_offset(n.0 - dx, n.1 - dy, 0, 0, dx, dy));
+                    collide.insert(
+                        Offset2(dx, dy),
+                        check_at_offset(n.0 - dx, n.1 - dy, dx, dy, 0, 0),
+                    );
+                    collide.insert(
+                        Offset2(-dx, dy),
+                        check_at_offset(n.0 - dx, n.1 - dy, 0, dy, dx, 0),
+                    );
+                    collide.insert(
+                        Offset2(dx, -dy),
+                        check_at_offset(n.0 - dx, n.1 - dy, dx, 0, 0, dy),
+                    );
+                    collide.insert(
+                        Offset2(-dx, -dy),
+                        check_at_offset(n.0 - dx, n.1 - dy, 0, 0, dx, dy),
+                    );
                 }
             }
 
@@ -459,11 +486,12 @@ impl<P> OverlappingSource2<P>
 
         OverlappingSource2 {
             palette: {
-                let mut vec = palette_map.iter().map(|(&p, &px)| (p, px)).collect::<Vec<_>>();
+                let mut vec = palette_map
+                    .iter()
+                    .map(|(&p, &px)| (p, px))
+                    .collect::<Vec<_>>();
                 vec.sort_by_key(|x| x.1);
-                vec.into_iter()
-                    .map(|x| x.0)
-                    .collect()
+                vec.into_iter().map(|x| x.0).collect()
             },
             inverse_palette: palette_map,
             samples: samples,
@@ -472,7 +500,6 @@ impl<P> OverlappingSource2<P>
             n: n,
         }
     }
-
 
     fn pick_sample<R: Rng>(&self, cfg: &mut BitSet, rng: &mut R) {
         let table: AliasTable<_, _> = cfg.iter().map(|i| self.weights[i]).collect();
@@ -483,28 +510,28 @@ impl<P> OverlappingSource2<P>
     }
 }
 
-
 impl<P> Source for OverlappingSource2<P>
-    where P: Eq + Hash + Copy
+where
+    P: Eq + Hash + Copy,
 {
     type Dims = Ix2;
     type Periodicity = (bool, bool);
     type Pixel = P;
 
-
     fn wave_dims(&self, dims: (usize, usize), periodic: (bool, bool)) -> (usize, usize) {
-        (if periodic.0 {
-            dims.0
-        } else {
-            dims.0 - (self.n.0 - 1)
-        },
-         if periodic.1 {
-            dims.1
-        } else {
-            dims.1 - (self.n.1 - 1)
-        })
+        (
+            if periodic.0 {
+                dims.0
+            } else {
+                dims.0 - (self.n.0 - 1)
+            },
+            if periodic.1 {
+                dims.1
+            } else {
+                dims.1 - (self.n.1 - 1)
+            },
+        )
     }
-
 
     fn initial_state(&self, pos: Ix2) -> State<Ix2> {
         let cfg = BitSet::from_bit_vec(BitVec::from_elem(self.samples.len(), true));
@@ -516,13 +543,13 @@ impl<P> Source for OverlappingSource2<P>
         }
     }
 
-
-    fn constrain(&self,
-                 states: Array2<RefCell<State<Ix2>>>,
-                 pos: Ix2,
-                 periodic: Self::Periodicity,
-                 val: P)
-                 -> Option<Array2<RefCell<State<Ix2>>>> {
+    fn constrain(
+        &self,
+        states: Array2<RefCell<State<Ix2>>>,
+        pos: Ix2,
+        periodic: Self::Periodicity,
+        val: P,
+    ) -> Option<Array2<RefCell<State<Ix2>>>> {
         let n = (self.n.0 as isize, self.n.1 as isize);
         let pid = self.inverse_palette[&val];
 
@@ -532,8 +559,10 @@ impl<P> Source for OverlappingSource2<P>
             for j in 0..n.1 {
                 let dim_adj_y = (states.dim().1 as isize - j) as usize;
 
-                let subject_pos = ((pos.0 + dim_adj_x) % states.dim().0,
-                                   (pos.1 + dim_adj_y) % states.dim().1);
+                let subject_pos = (
+                    (pos.0 + dim_adj_x) % states.dim().0,
+                    (pos.1 + dim_adj_y) % states.dim().1,
+                );
 
                 let mut subject = states[subject_pos].borrow_mut();
 
@@ -545,7 +574,8 @@ impl<P> Source for OverlappingSource2<P>
                     continue;
                 }
 
-                subject.cfg = subject.cfg
+                subject.cfg = subject
+                    .cfg
                     .iter()
                     .filter(|&idx| self.samples[idx].0[(i as usize, j as usize)] == pid)
                     .collect();
@@ -553,8 +583,10 @@ impl<P> Source for OverlappingSource2<P>
                 subject.entropy = self.entropy(&subject.cfg);
 
                 if !(subject.entropy >= 0.0) {
-                    debug!("Destroyed wave position {:?}'s hopes and dreams.",
-                           subject_pos);
+                    debug!(
+                        "Destroyed wave position {:?}'s hopes and dreams.",
+                        subject_pos
+                    );
                 }
             }
         }
@@ -562,12 +594,12 @@ impl<P> Source for OverlappingSource2<P>
         self.propagate(states, pos, periodic)
     }
 
-
-    fn propagate(&self,
-                 states: Array2<RefCell<State<Ix2>>>,
-                 observe: Ix2,
-                 periodic: Self::Periodicity)
-                 -> Option<Array2<RefCell<State<Ix2>>>> {
+    fn propagate(
+        &self,
+        states: Array2<RefCell<State<Ix2>>>,
+        observe: Ix2,
+        periodic: Self::Periodicity,
+    ) -> Option<Array2<RefCell<State<Ix2>>>> {
         let n = (self.n.0 as isize, self.n.1 as isize);
 
         let mut queue = VecDeque::new();
@@ -575,10 +607,10 @@ impl<P> Source for OverlappingSource2<P>
 
         while let Some(focus) = queue.pop_front() {
             let mut focus = match states.get(focus) {
-                    Some(state) => state,
-                    None => continue,
-                }
-                .borrow_mut();
+                Some(state) => state,
+                None => continue,
+            }
+            .borrow_mut();
 
             focus.entropy = self.entropy(&focus.cfg);
 
@@ -598,18 +630,22 @@ impl<P> Source for OverlappingSource2<P>
 
                         let dim_adj_y = (states.dim().1 as isize + j) as usize;
 
-                        let subject_pos = ((focus.pos.0 + dim_adj_x) % states.dim().0,
-                                           (focus.pos.1 + dim_adj_y) % states.dim().1);
+                        let subject_pos = (
+                            (focus.pos.0 + dim_adj_x) % states.dim().0,
+                            (focus.pos.1 + dim_adj_y) % states.dim().1,
+                        );
 
                         let mut subject = states[subject_pos].borrow_mut();
 
-                        if !periodic.0 &&
-                           (focus.pos.0 as isize - subject.pos.0 as isize).abs() >= n.0 {
+                        if !periodic.0
+                            && (focus.pos.0 as isize - subject.pos.0 as isize).abs() >= n.0
+                        {
                             continue;
                         }
 
-                        if !periodic.1 &&
-                           (focus.pos.1 as isize - subject.pos.1 as isize).abs() >= n.1 {
+                        if !periodic.1
+                            && (focus.pos.1 as isize - subject.pos.1 as isize).abs() >= n.1
+                        {
                             continue;
                         }
 
@@ -623,11 +659,13 @@ impl<P> Source for OverlappingSource2<P>
                             subject_allowed.clear();
 
                             for focus_cfg in focus.cfg.iter() {
-                                subject_allowed.union_with(&self.collide[&Offset2(i, j)][focus_cfg]);
+                                subject_allowed
+                                    .union_with(&self.collide[&Offset2(i, j)][focus_cfg]);
                             }
 
                             for subject_cfg in subject.cfg.iter() {
-                                focus_allowed.union_with(&self.collide[&Offset2(-i, -j)][subject_cfg]);
+                                focus_allowed
+                                    .union_with(&self.collide[&Offset2(-i, -j)][subject_cfg]);
                             }
 
                             let focus_len = focus.cfg.len();
@@ -667,17 +705,16 @@ impl<P> Source for OverlappingSource2<P>
         return Some(states);
     }
 
-
-    fn observe<R: Rng>(&self,
-                       mut states: Array2<RefCell<State<Ix2>>>,
-                       observe: Ix2,
-                       periodic: (bool, bool),
-                       rng: &mut R)
-                       -> Option<Array2<RefCell<State<Ix2>>>> {
+    fn observe<R: Rng>(
+        &self,
+        mut states: Array2<RefCell<State<Ix2>>>,
+        observe: Ix2,
+        periodic: (bool, bool),
+        rng: &mut R,
+    ) -> Option<Array2<RefCell<State<Ix2>>>> {
         self.pick_sample(&mut states[observe].borrow_mut().cfg, rng);
         self.propagate(states, observe, periodic)
     }
-
 
     fn entropy(&self, cfg: &BitSet) -> f64 {
         use std::f64;
@@ -687,14 +724,14 @@ impl<P> Source for OverlappingSource2<P>
         }
         let weights: Vec<f64> = cfg.iter().map(|i| self.weights[i].1).collect();
         let sum: f64 = weights.iter().sum();
-        weights.into_iter()
+        weights
+            .into_iter()
             .map(|w| {
                 let p = w / sum;
                 -(p * p.ln())
             })
             .sum()
     }
-
 
     fn resolve(&self, dim: Self::Dims, wave: ArrayView2<RefCell<State<Ix2>>>) -> Array2<P> {
         Array::from_shape_fn(dim, |(x, y)| {
@@ -708,13 +745,8 @@ impl<P> Source for OverlappingSource2<P>
             } else {
                 (wave.dim().1 - 1, y - (wave.dim().1 - 1))
             };
-            self.palette[self.samples[wave[(wx, wy)]
-                        .borrow()
-                        .cfg
-                        .iter()
-                        .next()
-                        .unwrap()]
-                    .0[(dx, dy)]
+            self.palette[self.samples[wave[(wx, wy)].borrow().cfg.iter().next().unwrap()].0
+                [(dx, dy)]
                 .0 as usize]
         })
     }

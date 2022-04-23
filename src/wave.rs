@@ -12,8 +12,7 @@ use ndarray::NdIndex;
 use rand::Rng;
 use rand::StdRng;
 
-use source::{Source, OverlappingSource2};
-
+use source::{OverlappingSource2, Source};
 
 #[derive(Clone)]
 pub struct State<P> {
@@ -22,9 +21,9 @@ pub struct State<P> {
     pub cfg: BitSet,
 }
 
-
 pub struct Wave<'a, R, S: ?Sized>
-    where S: 'a + Source
+where
+    S: 'a + Source,
 {
     source: &'a S,
 
@@ -36,7 +35,6 @@ pub struct Wave<'a, R, S: ?Sized>
 
     rng: R,
 }
-
 
 impl<'a, R, P: Eq + Hash + Copy> fmt::Debug for Wave<'a, R, OverlappingSource2<P>> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -51,15 +49,16 @@ impl<'a, R, P: Eq + Hash + Copy> fmt::Debug for Wave<'a, R, OverlappingSource2<P
     }
 }
 
-
 impl<'a, S: 'a + Source> Wave<'a, StdRng, S>
-    where S::Dims: Copy + Eq + Hash + Dimension + NdIndex<Dim = S::Dims>,
-          S::Periodicity: Copy
+where
+    S::Dims: Copy + Eq + Hash + Dimension + NdIndex<Dim = S::Dims>,
+    S::Periodicity: Copy,
 {
-    pub fn new(dims: S::Dims,
-               periodic: S::Periodicity,
-               source: &'a S)
-               -> io::Result<Wave<'a, StdRng, S>> {
+    pub fn new(
+        dims: S::Dims,
+        periodic: S::Periodicity,
+        source: &'a S,
+    ) -> io::Result<Wave<'a, StdRng, S>> {
         let mut unobserved = HashSet::new();
         let states = Array::from_shape_fn(source.wave_dims(dims, periodic), |pos| {
             unobserved.insert(pos);
@@ -82,13 +81,20 @@ impl<'a, S: 'a + Source> Wave<'a, StdRng, S>
     }
 }
 
-
 impl<'a, R: Rng, S: 'a + Source> Wave<'a, R, S>
-    where S::Dims: Copy + Eq + Ord + Hash + Dimension + NdIndex<Dim = S::Dims>,
-          S::Periodicity: Copy
+where
+    S::Dims: Copy + Eq + Ord + Hash + Dimension + NdIndex<Dim = S::Dims>,
+    S::Periodicity: Copy,
 {
     pub fn observe(self) -> Option<Self> {
-        let Wave { source, states, mut unobserved, dims, periodic, mut rng } = self;
+        let Wave {
+            source,
+            states,
+            mut unobserved,
+            dims,
+            periodic,
+            mut rng,
+        } = self;
 
         let observed = {
             let mut iter = unobserved.iter();
@@ -96,12 +102,13 @@ impl<'a, R: Rng, S: 'a + Source> Wave<'a, R, S>
                 Some(&p) => p,
                 None => return None,
             };
-            iter.fold(first,
-                      |f, &p| if states[p].borrow().entropy < states[f].borrow().entropy {
-                          p
-                      } else {
-                          f
-                      })
+            iter.fold(first, |f, &p| {
+                if states[p].borrow().entropy < states[f].borrow().entropy {
+                    p
+                } else {
+                    f
+                }
+            })
         };
 
         unobserved.remove(&observed);
@@ -121,7 +128,6 @@ impl<'a, R: Rng, S: 'a + Source> Wave<'a, R, S>
         });
     }
 
-
     pub fn collapse(mut self) -> Option<Array<S::Pixel, S::Dims>> {
         while !self.is_collapsed() {
             self = match self.observe() {
@@ -133,30 +139,32 @@ impl<'a, R: Rng, S: 'a + Source> Wave<'a, R, S>
         Some(self.source.resolve(self.dims, self.states.view()))
     }
 
-
     pub fn resolve(&self) -> Array<S::Pixel, S::Dims> {
         assert!(self.is_collapsed());
         self.source.resolve(self.dims, self.states.view())
     }
 
-
     pub fn is_collapsed(&self) -> bool {
         self.unobserved.is_empty()
     }
-
 
     pub fn len(&self) -> usize {
         self.states.len()
     }
 
-
     pub fn uncollapsed(&self) -> usize {
         self.unobserved.len()
     }
 
-
     pub fn constrain(self, pos: S::Dims, val: S::Pixel) -> Option<Self> {
-        let Wave { source, states, unobserved, dims, periodic, rng } = self;
+        let Wave {
+            source,
+            states,
+            unobserved,
+            dims,
+            periodic,
+            rng,
+        } = self;
 
         let states = match source.constrain(states, pos, periodic, val) {
             Some(states) => states,
@@ -173,7 +181,6 @@ impl<'a, R: Rng, S: 'a + Source> Wave<'a, R, S>
         });
     }
 }
-
 
 // #[cfg(test)]
 // mod tests {

@@ -20,21 +20,16 @@ use rand::Rng;
 use source::Source;
 use wave::State;
 
-
 type RcArray3<A> = RcArray<A, Ix3>;
-
 
 #[derive(Copy, Clone)]
 pub struct Point3(u32, u32, u32);
 
-
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Copy, Clone, Debug)]
 struct Pixel3(u32);
 
-
 #[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
 pub struct Offset3(isize, isize, isize);
-
 
 impl Sub for Point3 {
     type Output = Offset3;
@@ -48,7 +43,6 @@ impl Sub for Point3 {
     }
 }
 
-
 impl Neg for Offset3 {
     type Output = Self;
 
@@ -56,7 +50,6 @@ impl Neg for Offset3 {
         Offset3(-self.0, -self.1, -self.2)
     }
 }
-
 
 pub struct OverlappingSource3<P> {
     palette: Vec<P>,
@@ -69,7 +62,6 @@ pub struct OverlappingSource3<P> {
 
     n: (usize, usize, usize),
 }
-
 
 pub mod symmetry {
     bitflags! {
@@ -150,9 +142,10 @@ pub mod symmetry {
 
     impl Symmetry3 {
         #[inline]
-        pub fn find_symmetry_dimensions(symmetry: u64,
-                                        (mut x, mut y, mut z): (usize, usize, usize))
-                                        -> (usize, usize, usize) {
+        pub fn find_symmetry_dimensions(
+            symmetry: u64,
+            (mut x, mut y, mut z): (usize, usize, usize),
+        ) -> (usize, usize, usize) {
             use std::mem::swap;
 
             if symmetry & JS3_REFLECT != 0 {
@@ -180,10 +173,11 @@ pub mod symmetry {
         }
 
         #[inline]
-        pub fn apply_symmetry(symmetry: u64,
-                              (bx, by, bz): (usize, usize, usize),
-                              (mut x, mut y, mut z): (usize, usize, usize))
-                              -> (usize, usize, usize) {
+        pub fn apply_symmetry(
+            symmetry: u64,
+            (bx, by, bz): (usize, usize, usize),
+            (mut x, mut y, mut z): (usize, usize, usize),
+        ) -> (usize, usize, usize) {
             use std::mem::swap;
 
             if symmetry & JS3_REFLECT != 0 {
@@ -228,12 +222,12 @@ pub mod symmetry {
             (x, y, z)
         }
 
-
         #[inline]
-        pub fn invert_symmetry(symmetry: u64,
-                               (bx, by, bz): (usize, usize, usize),
-                               (mut x, mut y, mut z): (usize, usize, usize))
-                               -> (usize, usize, usize) {
+        pub fn invert_symmetry(
+            symmetry: u64,
+            (bx, by, bz): (usize, usize, usize),
+            (mut x, mut y, mut z): (usize, usize, usize),
+        ) -> (usize, usize, usize) {
             use std::mem::swap;
 
             match symmetry & JS3_ROT180_MASK {
@@ -281,26 +275,31 @@ pub mod symmetry {
 }
 use self::symmetry::*;
 
-
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Sample3<P>(RcArray3<P>);
 
-
 impl<P> OverlappingSource3<P>
-    where P: Copy
+where
+    P: Copy,
 {
-    pub fn from_image_stack<I: GenericImage<Pixel = P> + 'static>(imgs: Vec<I>,
-                                                                  n: (usize, usize, usize),
-                                                                  periodic: (bool, bool, bool),
-                                                                  symmetry: Symmetry3)
-                                                                  -> Self
-        where P: Pixel + Eq + Hash + 'static
+    pub fn from_image_stack<I: GenericImage<Pixel = P> + 'static>(
+        imgs: Vec<I>,
+        n: (usize, usize, usize),
+        periodic: (bool, bool, bool),
+        symmetry: Symmetry3,
+    ) -> Self
+    where
+        P: Pixel + Eq + Hash + 'static,
     {
         debug!("Generating palette map...");
 
-        let palette_set: HashSet<P> =
-            imgs.iter().flat_map(|img| img.pixels()).map(|(_, _, p)| p).collect();
-        let palette_map: HashMap<P, Pixel3> = palette_set.into_iter()
+        let palette_set: HashSet<P> = imgs
+            .iter()
+            .flat_map(|img| img.pixels())
+            .map(|(_, _, p)| p)
+            .collect();
+        let palette_map: HashMap<P, Pixel3> = palette_set
+            .into_iter()
             .enumerate()
             .map(|(i, p)| (p, Pixel3(i as u32)))
             .collect();
@@ -323,9 +322,11 @@ impl<P> OverlappingSource3<P>
                 if symm_bits & 0b1 != 0 {
                     let symm_dims = {
                         let (x, y, z) = Symmetry3::find_symmetry_dimensions(symm_n, n);
-                        (if periodic.0 { x } else { x - (n.0 - 1) },
-                         if periodic.1 { y } else { y - (n.1 - 1) },
-                         if periodic.2 { z } else { z - (n.2 - 1) })
+                        (
+                            if periodic.0 { x } else { x - (n.0 - 1) },
+                            if periodic.1 { y } else { y - (n.1 - 1) },
+                            if periodic.2 { z } else { z - (n.2 - 1) },
+                        )
                     };
                     symmetries.push(RcArray3::from_shape_fn(symm_dims, |(x, y, z)| {
                         pixels[{
@@ -342,7 +343,6 @@ impl<P> OverlappingSource3<P>
             symmetries
         };
 
-
         let (samples, weights) = {
             let mut sample_set = HashMap::new();
             for symmetry in symmetries {
@@ -350,9 +350,11 @@ impl<P> OverlappingSource3<P>
                     for j in 0..symmetry.dim().1 - (n.1 - 1) {
                         for k in 0..symmetry.dim().2 - (n.2 - 1) {
                             let mut sample = symmetry.to_shared();
-                            sample.islice(s![i as isize..(i + n.0) as isize,
-                                             j as isize..(j + n.1) as isize,
-                                             k as isize..(k + n.2) as isize]);
+                            sample.islice(s![
+                                i as isize..(i + n.0) as isize,
+                                j as isize..(j + n.1) as isize,
+                                k as isize..(k + n.2) as isize
+                            ]);
                             *sample_set.entry(Sample3(sample)).or_insert(0) += 1;
                         }
                     }
@@ -363,7 +365,8 @@ impl<P> OverlappingSource3<P>
 
             let (samples, weight_vec): (Vec<_>, Vec<_>) = sample_set.into_iter().unzip();
 
-            let weights: Vec<_> = weight_vec.into_iter()
+            let weights: Vec<_> = weight_vec
+                .into_iter()
                 .enumerate()
                 .map(|(i, x)| (i, x as f64))
                 .collect();
@@ -384,8 +387,10 @@ impl<P> OverlappingSource3<P>
         //     debug_assert_eq!(sample.dim(), (3, 3));
         // }
 
-        debug!("Generating collision map. {} samples to collide.",
-               samples.len());
+        debug!(
+            "Generating collision map. {} samples to collide.",
+            samples.len()
+        );
 
         let collide = {
             let mut collide = HashMap::new();
@@ -400,12 +405,10 @@ impl<P> OverlappingSource3<P>
                         for i in 0..dx {
                             for j in 0..dy {
                                 for k in 0..dz {
-                                    let p_l = l[((lx + i) as usize,
-                                                 (ly + j) as usize,
-                                                 (lz + k) as usize)];
-                                    let p_r = r[((rx + i) as usize,
-                                                 (ry + j) as usize,
-                                                 (rz + k) as usize)];
+                                    let p_l = l
+                                        [((lx + i) as usize, (ly + j) as usize, (lz + k) as usize)];
+                                    let p_r = r
+                                        [((rx + i) as usize, (ry + j) as usize, (rz + k) as usize)];
                                     if p_l != p_r {
                                         continue 'rcheck;
                                     }
@@ -422,86 +425,38 @@ impl<P> OverlappingSource3<P>
             for dx in 0..n.0 {
                 for dy in 0..n.1 {
                     for dz in 0..n.2 {
-                        collide.insert(Offset3(dx, dy, dz),
-                                       check_at_offset(n.0 - dx,
-                                                       n.1 - dy,
-                                                       n.2 - dz,
-                                                       dx,
-                                                       dy,
-                                                       dz,
-                                                       0,
-                                                       0,
-                                                       0));
-                        collide.insert(Offset3(-dx, dy, dz),
-                                       check_at_offset(n.0 - dx,
-                                                       n.1 - dy,
-                                                       n.2 - dz,
-                                                       0,
-                                                       dy,
-                                                       dz,
-                                                       dx,
-                                                       0,
-                                                       0));
-                        collide.insert(Offset3(dx, -dy, dz),
-                                       check_at_offset(n.0 - dx,
-                                                       n.1 - dy,
-                                                       n.2 - dz,
-                                                       dx,
-                                                       0,
-                                                       dz,
-                                                       0,
-                                                       dy,
-                                                       0));
-                        collide.insert(Offset3(-dx, -dy, dz),
-                                       check_at_offset(n.0 - dx,
-                                                       n.1 - dy,
-                                                       n.2 - dz,
-                                                       0,
-                                                       0,
-                                                       dz,
-                                                       dx,
-                                                       dy,
-                                                       0));
-                        collide.insert(Offset3(dx, dy, -dz),
-                                       check_at_offset(n.0 - dx,
-                                                       n.1 - dy,
-                                                       n.2 - dz,
-                                                       dx,
-                                                       dy,
-                                                       0,
-                                                       0,
-                                                       0,
-                                                       dz));
-                        collide.insert(Offset3(-dx, dy, -dz),
-                                       check_at_offset(n.0 - dx,
-                                                       n.1 - dy,
-                                                       n.2 - dz,
-                                                       0,
-                                                       dy,
-                                                       0,
-                                                       dx,
-                                                       0,
-                                                       dz));
-                        collide.insert(Offset3(dx, -dy, -dz),
-                                       check_at_offset(n.0 - dx,
-                                                       n.1 - dy,
-                                                       n.2 - dz,
-                                                       dx,
-                                                       0,
-                                                       0,
-                                                       0,
-                                                       dy,
-                                                       dz));
-                        collide.insert(Offset3(-dx, -dy, -dz),
-                                       check_at_offset(n.0 - dx,
-                                                       n.1 - dy,
-                                                       n.2 - dz,
-                                                       0,
-                                                       0,
-                                                       0,
-                                                       dx,
-                                                       dy,
-                                                       dz));
+                        collide.insert(
+                            Offset3(dx, dy, dz),
+                            check_at_offset(n.0 - dx, n.1 - dy, n.2 - dz, dx, dy, dz, 0, 0, 0),
+                        );
+                        collide.insert(
+                            Offset3(-dx, dy, dz),
+                            check_at_offset(n.0 - dx, n.1 - dy, n.2 - dz, 0, dy, dz, dx, 0, 0),
+                        );
+                        collide.insert(
+                            Offset3(dx, -dy, dz),
+                            check_at_offset(n.0 - dx, n.1 - dy, n.2 - dz, dx, 0, dz, 0, dy, 0),
+                        );
+                        collide.insert(
+                            Offset3(-dx, -dy, dz),
+                            check_at_offset(n.0 - dx, n.1 - dy, n.2 - dz, 0, 0, dz, dx, dy, 0),
+                        );
+                        collide.insert(
+                            Offset3(dx, dy, -dz),
+                            check_at_offset(n.0 - dx, n.1 - dy, n.2 - dz, dx, dy, 0, 0, 0, dz),
+                        );
+                        collide.insert(
+                            Offset3(-dx, dy, -dz),
+                            check_at_offset(n.0 - dx, n.1 - dy, n.2 - dz, 0, dy, 0, dx, 0, dz),
+                        );
+                        collide.insert(
+                            Offset3(dx, -dy, -dz),
+                            check_at_offset(n.0 - dx, n.1 - dy, n.2 - dz, dx, 0, 0, 0, dy, dz),
+                        );
+                        collide.insert(
+                            Offset3(-dx, -dy, -dz),
+                            check_at_offset(n.0 - dx, n.1 - dy, n.2 - dz, 0, 0, 0, dx, dy, dz),
+                        );
                     }
                 }
             }
@@ -513,11 +468,12 @@ impl<P> OverlappingSource3<P>
 
         OverlappingSource3 {
             palette: {
-                let mut vec = palette_map.iter().map(|(&p, &px)| (p, px)).collect::<Vec<_>>();
+                let mut vec = palette_map
+                    .iter()
+                    .map(|(&p, &px)| (p, px))
+                    .collect::<Vec<_>>();
                 vec.sort_by_key(|x| x.1);
-                vec.into_iter()
-                    .map(|x| x.0)
-                    .collect()
+                vec.into_iter().map(|x| x.0).collect()
             },
             inverse_palette: palette_map,
             samples: samples,
@@ -527,7 +483,6 @@ impl<P> OverlappingSource3<P>
         }
     }
 
-
     fn pick_sample<R: Rng>(&self, cfg: &mut BitSet, rng: &mut R) {
         let table: AliasTable<_, _> = cfg.iter().map(|i| self.weights[i]).collect();
         let chosen = table.pick(rng);
@@ -536,36 +491,37 @@ impl<P> OverlappingSource3<P>
     }
 }
 
-
 impl<P> Source for OverlappingSource3<P>
-    where P: Eq + Hash + Copy
+where
+    P: Eq + Hash + Copy,
 {
     type Dims = Ix3;
     type Periodicity = (bool, bool, bool);
     type Pixel = P;
 
-
-    fn wave_dims(&self,
-                 dims: (usize, usize, usize),
-                 periodic: (bool, bool, bool))
-                 -> (usize, usize, usize) {
-        (if periodic.0 {
-            dims.0
-        } else {
-            dims.0 - (self.n.0 - 1)
-        },
-         if periodic.1 {
-            dims.1
-        } else {
-            dims.1 - (self.n.1 - 1)
-        },
-         if periodic.2 {
-            dims.2
-        } else {
-            dims.2 - (self.n.2 - 1)
-        })
+    fn wave_dims(
+        &self,
+        dims: (usize, usize, usize),
+        periodic: (bool, bool, bool),
+    ) -> (usize, usize, usize) {
+        (
+            if periodic.0 {
+                dims.0
+            } else {
+                dims.0 - (self.n.0 - 1)
+            },
+            if periodic.1 {
+                dims.1
+            } else {
+                dims.1 - (self.n.1 - 1)
+            },
+            if periodic.2 {
+                dims.2
+            } else {
+                dims.2 - (self.n.2 - 1)
+            },
+        )
     }
-
 
     fn initial_state(&self, pos: Ix3) -> State<Ix3> {
         let cfg = BitSet::from_bit_vec(BitVec::from_elem(self.samples.len(), true));
@@ -577,13 +533,13 @@ impl<P> Source for OverlappingSource3<P>
         }
     }
 
-
-    fn constrain(&self,
-                 states: Array3<RefCell<State<Ix3>>>,
-                 pos: Ix3,
-                 periodic: Self::Periodicity,
-                 val: P)
-                 -> Option<Array3<RefCell<State<Ix3>>>> {
+    fn constrain(
+        &self,
+        states: Array3<RefCell<State<Ix3>>>,
+        pos: Ix3,
+        periodic: Self::Periodicity,
+        val: P,
+    ) -> Option<Array3<RefCell<State<Ix3>>>> {
         let n = (self.n.0 as isize, self.n.1 as isize, self.n.2 as isize);
         let pid = self.inverse_palette[&val];
 
@@ -596,9 +552,11 @@ impl<P> Source for OverlappingSource3<P>
                 for k in 0..n.2 {
                     let dim_adj_z = (states.dim().2 as isize - k) as usize;
 
-                    let subject_pos = ((pos.0 + dim_adj_x) % states.dim().0,
-                                       (pos.1 + dim_adj_y) % states.dim().1,
-                                       (pos.2 + dim_adj_z) % states.dim().2);
+                    let subject_pos = (
+                        (pos.0 + dim_adj_x) % states.dim().0,
+                        (pos.1 + dim_adj_y) % states.dim().1,
+                        (pos.2 + dim_adj_z) % states.dim().2,
+                    );
 
                     let mut subject = states[subject_pos].borrow_mut();
 
@@ -614,7 +572,8 @@ impl<P> Source for OverlappingSource3<P>
                         continue;
                     }
 
-                    subject.cfg = subject.cfg
+                    subject.cfg = subject
+                        .cfg
                         .iter()
                         .filter(|&idx| {
                             self.samples[idx].0[(i as usize, j as usize, k as usize)] == pid
@@ -624,8 +583,10 @@ impl<P> Source for OverlappingSource3<P>
                     subject.entropy = self.entropy(&subject.cfg);
 
                     if !(subject.entropy >= 0.0) {
-                        debug!("Destroyed wave position {:?}'s hopes and dreams.",
-                               subject_pos);
+                        debug!(
+                            "Destroyed wave position {:?}'s hopes and dreams.",
+                            subject_pos
+                        );
                     }
                 }
             }
@@ -634,12 +595,12 @@ impl<P> Source for OverlappingSource3<P>
         self.propagate(states, pos, periodic)
     }
 
-
-    fn propagate(&self,
-                 states: Array3<RefCell<State<Ix3>>>,
-                 observe: Ix3,
-                 periodic: Self::Periodicity)
-                 -> Option<Array3<RefCell<State<Ix3>>>> {
+    fn propagate(
+        &self,
+        states: Array3<RefCell<State<Ix3>>>,
+        observe: Ix3,
+        periodic: Self::Periodicity,
+    ) -> Option<Array3<RefCell<State<Ix3>>>> {
         let n = (self.n.0 as isize, self.n.1 as isize, self.n.2 as isize);
 
         let mut queue = VecDeque::new();
@@ -647,10 +608,10 @@ impl<P> Source for OverlappingSource3<P>
 
         while let Some(focus) = queue.pop_front() {
             let mut focus = match states.get(focus) {
-                    Some(state) => state,
-                    None => continue,
-                }
-                .borrow_mut();
+                Some(state) => state,
+                None => continue,
+            }
+            .borrow_mut();
 
             focus.entropy = self.entropy(&focus.cfg);
 
@@ -673,24 +634,29 @@ impl<P> Source for OverlappingSource3<P>
 
                             let dim_adj_z = (states.dim().2 as isize + k) as usize;
 
-                            let subject_pos = ((focus.pos.0 + dim_adj_x) % states.dim().0,
-                                               (focus.pos.1 + dim_adj_y) % states.dim().1,
-                                               (focus.pos.2 + dim_adj_z) % states.dim().2);
+                            let subject_pos = (
+                                (focus.pos.0 + dim_adj_x) % states.dim().0,
+                                (focus.pos.1 + dim_adj_y) % states.dim().1,
+                                (focus.pos.2 + dim_adj_z) % states.dim().2,
+                            );
 
                             let mut subject = states[subject_pos].borrow_mut();
 
-                            if !periodic.0 &&
-                               (focus.pos.0 as isize - subject.pos.0 as isize).abs() >= n.0 {
+                            if !periodic.0
+                                && (focus.pos.0 as isize - subject.pos.0 as isize).abs() >= n.0
+                            {
                                 continue;
                             }
 
-                            if !periodic.1 &&
-                               (focus.pos.1 as isize - subject.pos.1 as isize).abs() >= n.1 {
+                            if !periodic.1
+                                && (focus.pos.1 as isize - subject.pos.1 as isize).abs() >= n.1
+                            {
                                 continue;
                             }
 
-                            if !periodic.2 &&
-                               (focus.pos.2 as isize - subject.pos.2 as isize).abs() >= n.2 {
+                            if !periodic.2
+                                && (focus.pos.2 as isize - subject.pos.2 as isize).abs() >= n.2
+                            {
                                 continue;
                             }
 
@@ -704,11 +670,14 @@ impl<P> Source for OverlappingSource3<P>
                                 subject_allowed.clear();
 
                                 for focus_cfg in focus.cfg.iter() {
-                                    subject_allowed.union_with(&self.collide[&Offset3(i, j, k)][focus_cfg]);
+                                    subject_allowed
+                                        .union_with(&self.collide[&Offset3(i, j, k)][focus_cfg]);
                                 }
 
                                 for subject_cfg in subject.cfg.iter() {
-                                    focus_allowed.union_with(&self.collide[&Offset3(-i, -j, -k)][subject_cfg]);
+                                    focus_allowed.union_with(
+                                        &self.collide[&Offset3(-i, -j, -k)][subject_cfg],
+                                    );
                                 }
 
                                 let focus_len = focus.cfg.len();
@@ -749,17 +718,16 @@ impl<P> Source for OverlappingSource3<P>
         return Some(states);
     }
 
-
-    fn observe<R: Rng>(&self,
-                       mut states: Array3<RefCell<State<Ix3>>>,
-                       observe: Ix3,
-                       periodic: Self::Periodicity,
-                       rng: &mut R)
-                       -> Option<Array3<RefCell<State<Ix3>>>> {
+    fn observe<R: Rng>(
+        &self,
+        mut states: Array3<RefCell<State<Ix3>>>,
+        observe: Ix3,
+        periodic: Self::Periodicity,
+        rng: &mut R,
+    ) -> Option<Array3<RefCell<State<Ix3>>>> {
         self.pick_sample(&mut states[observe].borrow_mut().cfg, rng);
         self.propagate(states, observe, periodic)
     }
-
 
     fn entropy(&self, cfg: &BitSet) -> f64 {
         use std::f64;
@@ -769,14 +737,14 @@ impl<P> Source for OverlappingSource3<P>
         }
         let weights: Vec<f64> = cfg.iter().map(|i| self.weights[i].1).collect();
         let sum: f64 = weights.iter().sum();
-        weights.into_iter()
+        weights
+            .into_iter()
             .map(|w| {
                 let p = w / sum;
                 -(p * p.ln())
             })
             .sum()
     }
-
 
     fn resolve<'a>(&self, dim: Self::Dims, wave: ArrayView3<'a, RefCell<State<Ix3>>>) -> Array3<P> {
         Array::from_shape_fn(dim, |(x, y, z)| {
@@ -795,76 +763,101 @@ impl<P> Source for OverlappingSource3<P>
             } else {
                 (wave.dim().2 - 1, z - (wave.dim().2 - 1))
             };
-            self.palette[self.samples[wave[(wx, wy, wz)]
-                        .borrow()
-                        .cfg
-                        .iter()
-                        .next()
-                        .unwrap()]
-                    .0[(dx, dy, dz)]
+            self.palette[self.samples[wave[(wx, wy, wz)].borrow().cfg.iter().next().unwrap()].0
+                [(dx, dy, dz)]
                 .0 as usize]
         })
     }
 }
 
-
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::symmetry::*;
+    use super::*;
 
     #[test]
     fn schmidt_symmetries() {
         // Ensure that black magic symmetry code *actually works.*
 
-        assert_eq!(Symmetry3::apply_symmetry(JS3_REFLECT | JS3_SWAP_TETRA | JS3_ROT180_Y,
-                                             (1, 1, 1),
-                                             (0, 0, 0)),
-                   (1, 0, 0));
-        assert_eq!(Symmetry3::apply_symmetry(JS3_REFLECT | JS3_SWAP_TETRA | JS3_ROT180_X,
-                                             (1, 1, 1),
-                                             (0, 0, 0)),
-                   (0, 1, 0));
-        assert_eq!(Symmetry3::apply_symmetry(JS3_REFLECT | JS3_SWAP_TETRA, (1, 1, 1), (0, 0, 0)),
-                   (0, 0, 1));
-        assert_eq!(Symmetry3::apply_symmetry(JS3_REFLECT | JS3_SWAP_TETRA | JS3_ROT180_Y,
-                                             (1, 1, 1),
-                                             (1, 0, 0)),
-                   (0, 0, 0));
-        assert_eq!(Symmetry3::apply_symmetry(JS3_REFLECT | JS3_SWAP_TETRA | JS3_ROT180_X,
-                                             (1, 1, 1),
-                                             (0, 1, 0)),
-                   (0, 0, 0));
-        assert_eq!(Symmetry3::apply_symmetry(JS3_REFLECT | JS3_SWAP_TETRA, (1, 1, 1), (0, 0, 1)),
-                   (0, 0, 0));
-        assert_eq!(Symmetry3::apply_symmetry(JS3_REFLECT | JS3_SWAP_TETRA | JS3_ROT180_Y,
-                                             (1, 1, 1),
-                                             (0, 0, 0)),
-                   (1, 0, 0));
-        assert_eq!(Symmetry3::apply_symmetry(JS3_REFLECT | JS3_SWAP_TETRA | JS3_ROT180_X,
-                                             (1, 1, 1),
-                                             (0, 0, 0)),
-                   (0, 1, 0));
-        assert_eq!(Symmetry3::apply_symmetry(JS3_REFLECT | JS3_SWAP_TETRA, (1, 1, 1), (0, 0, 0)),
-                   (0, 0, 1));
+        assert_eq!(
+            Symmetry3::apply_symmetry(
+                JS3_REFLECT | JS3_SWAP_TETRA | JS3_ROT180_Y,
+                (1, 1, 1),
+                (0, 0, 0)
+            ),
+            (1, 0, 0)
+        );
+        assert_eq!(
+            Symmetry3::apply_symmetry(
+                JS3_REFLECT | JS3_SWAP_TETRA | JS3_ROT180_X,
+                (1, 1, 1),
+                (0, 0, 0)
+            ),
+            (0, 1, 0)
+        );
+        assert_eq!(
+            Symmetry3::apply_symmetry(JS3_REFLECT | JS3_SWAP_TETRA, (1, 1, 1), (0, 0, 0)),
+            (0, 0, 1)
+        );
+        assert_eq!(
+            Symmetry3::apply_symmetry(
+                JS3_REFLECT | JS3_SWAP_TETRA | JS3_ROT180_Y,
+                (1, 1, 1),
+                (1, 0, 0)
+            ),
+            (0, 0, 0)
+        );
+        assert_eq!(
+            Symmetry3::apply_symmetry(
+                JS3_REFLECT | JS3_SWAP_TETRA | JS3_ROT180_X,
+                (1, 1, 1),
+                (0, 1, 0)
+            ),
+            (0, 0, 0)
+        );
+        assert_eq!(
+            Symmetry3::apply_symmetry(JS3_REFLECT | JS3_SWAP_TETRA, (1, 1, 1), (0, 0, 1)),
+            (0, 0, 0)
+        );
+        assert_eq!(
+            Symmetry3::apply_symmetry(
+                JS3_REFLECT | JS3_SWAP_TETRA | JS3_ROT180_Y,
+                (1, 1, 1),
+                (0, 0, 0)
+            ),
+            (1, 0, 0)
+        );
+        assert_eq!(
+            Symmetry3::apply_symmetry(
+                JS3_REFLECT | JS3_SWAP_TETRA | JS3_ROT180_X,
+                (1, 1, 1),
+                (0, 0, 0)
+            ),
+            (0, 1, 0)
+        );
+        assert_eq!(
+            Symmetry3::apply_symmetry(JS3_REFLECT | JS3_SWAP_TETRA, (1, 1, 1), (0, 0, 0)),
+            (0, 0, 1)
+        );
 
         for x in 0..2 {
             for y in 0..2 {
                 for z in 0..2 {
-                    for &s in [0u64, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 16, 17, 18, 19, 20, 21,
-                               22, 23, 24, 25, 26, 27, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41,
-                               42, 43, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59]
-                        .into_iter() {
-                        assert_eq!(Symmetry3::invert_symmetry(s,
-                                                              (1, 1, 1),
-                                                              Symmetry3::apply_symmetry(s,
-                                                                                        (1,
-                                                                                         1,
-                                                                                         1),
-                                                                                        (x,
-                                                                                         y,
-                                                                                         z))),
-                                   (x, y, z));
+                    for &s in [
+                        0u64, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 16, 17, 18, 19, 20, 21, 22, 23,
+                        24, 25, 26, 27, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 48, 49, 50,
+                        51, 52, 53, 54, 55, 56, 57, 58, 59,
+                    ]
+                    .into_iter()
+                    {
+                        assert_eq!(
+                            Symmetry3::invert_symmetry(
+                                s,
+                                (1, 1, 1),
+                                Symmetry3::apply_symmetry(s, (1, 1, 1), (x, y, z))
+                            ),
+                            (x, y, z)
+                        );
                     }
                 }
             }

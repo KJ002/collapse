@@ -7,56 +7,62 @@ extern crate lazy_static;
 extern crate pbr;
 extern crate regex;
 
-
 use std::str::FromStr;
 
-
-use image::{GenericImageView, ImageBuffer};
 use clap::{App, AppSettings, Arg, ArgGroup, SubCommand};
 use collapse::*;
+use image::{GenericImageView, ImageBuffer};
 use pbr::ProgressBar;
 use regex::Regex;
-
 
 lazy_static! {
     static ref MATCH_RANGE: Regex = Regex::new(r"^(-?\d+)..(-?\d+)$").unwrap();
 }
 
-
 fn validate_constraint(constraint: String) -> Result<(), String> {
     let split: Vec<_> = constraint.split(',').collect();
 
     if split.len() != 4 {
-        return Err(format!("Expected four values to the constraint - the x and y of the \
+        return Err(format!(
+            "Expected four values to the constraint - the x and y of the \
                                  pixel in the input, and the x and y pixels/ranges in the \
                                  output, but got {} values",
-                           split.len()));
+            split.len()
+        ));
     } else {
         match (split[0].parse::<i32>(), split[1].parse::<i32>()) {
             (Ok(_), Ok(_)) => (),
             _ => {
-                return Err(String::from("Expected the input x and y coordinates to be signed \
-                                         integers"));
+                return Err(String::from(
+                    "Expected the input x and y coordinates to be signed \
+                                         integers",
+                ));
             }
         }
 
         match (split[2].parse::<i32>(), split[3].parse::<i32>()) {
             (Err(_), Ok(_)) => {
                 if !MATCH_RANGE.is_match(split[2]) {
-                    return Err(String::from("Expected the output x coordinate to either be a \
-                                             signed integer or a range of signed integers"));
+                    return Err(String::from(
+                        "Expected the output x coordinate to either be a \
+                                             signed integer or a range of signed integers",
+                    ));
                 }
             }
             (Ok(_), Err(_)) => {
                 if !MATCH_RANGE.is_match(split[3]) {
-                    return Err(String::from("Expected the output y coordinate to either be a \
-                                             signed integer or a range of signed integers"));
+                    return Err(String::from(
+                        "Expected the output y coordinate to either be a \
+                                             signed integer or a range of signed integers",
+                    ));
                 }
             }
             (Err(_), Err(_)) => {
                 if !MATCH_RANGE.is_match(split[2]) || !MATCH_RANGE.is_match(split[3]) {
-                    return Err(String::from("Expected the output x and y coordinates to either \
-                                             be a signed integer or a range of signed integers"));
+                    return Err(String::from(
+                        "Expected the output x and y coordinates to either \
+                                             be a signed integer or a range of signed integers",
+                    ));
                 }
             }
             _ => (),
@@ -65,7 +71,6 @@ fn validate_constraint(constraint: String) -> Result<(), String> {
 
     Ok(())
 }
-
 
 fn main() {
     let app = App::new("collapse")
@@ -178,16 +183,16 @@ fn main() {
 
     if let Some(matches) = matches.subcommand_matches("2d") {
         let periodic_input = if matches.is_present("periodic-input") {
-            let vec = values_t!(matches.values_of("periodic-input"), bool)
-                .unwrap_or_else(|e| e.exit());
+            let vec =
+                values_t!(matches.values_of("periodic-input"), bool).unwrap_or_else(|e| e.exit());
             (vec[0], vec[1])
         } else {
             (false, false)
         };
 
         let periodic_output = if matches.is_present("periodic-output") {
-            let vec = values_t!(matches.values_of("periodic-output"), bool)
-                .unwrap_or_else(|e| e.exit());
+            let vec =
+                values_t!(matches.values_of("periodic-output"), bool).unwrap_or_else(|e| e.exit());
             (vec[0], vec[1])
         } else {
             (true, true)
@@ -201,8 +206,8 @@ fn main() {
         };
 
         let output_dims = {
-            let vec = values_t!(matches.values_of("output-dims"), usize)
-                .unwrap_or_else(|e| e.exit());
+            let vec =
+                values_t!(matches.values_of("output-dims"), usize).unwrap_or_else(|e| e.exit());
             (vec[0], vec[1])
         };
 
@@ -257,13 +262,16 @@ fn main() {
 
         let constraints: Vec<((usize, usize), (u32, u32))> =
             if matches.is_present("pixel-constraint") {
-                matches.values_of("pixel-constraint")
+                matches
+                    .values_of("pixel-constraint")
                     .unwrap()
                     .flat_map(|coords| {
                         let coords: Vec<_> = coords.split(',').collect();
 
-                        let (input_x, input_y) = (coords[0].parse::<i32>().unwrap(),
-                                                  coords[1].parse::<i32>().unwrap());
+                        let (input_x, input_y) = (
+                            coords[0].parse::<i32>().unwrap(),
+                            coords[1].parse::<i32>().unwrap(),
+                        );
 
                         let input_x = if input_x < 0 {
                             input_x + input_dims.0 as i32
@@ -276,60 +284,60 @@ fn main() {
                             input_y
                         } as u32;
 
-                        let outputs_x: Vec<_> =
-                            if let Ok(output_x) = coords[2].parse::<i32>() {
-                                vec![if output_x < 0 {
-                                    output_x + output_dims.0 as i32
-                                } else {
-                                    output_x
-                                } as usize]
-                            } else if let Some(caps) = MATCH_RANGE.captures(coords[2]) {
-                                let (x0, x1) =
-                                    (caps.at(1).and_then(|s| i32::from_str(s).ok()).unwrap(),
-                                     caps.at(2).and_then(|s| i32::from_str(s).ok()).unwrap());
-                                let x0 = if x0 < 0 {
-                                    x0 as usize + output_dims.0
-                                } else {
-                                    x0 as usize
-                                };
-                                let x1 = if x1 < 0 {
-                                    x1 as usize + output_dims.0
-                                } else {
-                                    x1 as usize
-                                };
-                                if x0 < x1 { x0..x1 } else { x1..x0 }.collect()
+                        let outputs_x: Vec<_> = if let Ok(output_x) = coords[2].parse::<i32>() {
+                            vec![if output_x < 0 {
+                                output_x + output_dims.0 as i32
                             } else {
-                                unreachable!();
+                                output_x
+                            } as usize]
+                        } else if let Some(caps) = MATCH_RANGE.captures(coords[2]) {
+                            let (x0, x1) = (
+                                caps.at(1).and_then(|s| i32::from_str(s).ok()).unwrap(),
+                                caps.at(2).and_then(|s| i32::from_str(s).ok()).unwrap(),
+                            );
+                            let x0 = if x0 < 0 {
+                                x0 as usize + output_dims.0
+                            } else {
+                                x0 as usize
+                            };
+                            let x1 = if x1 < 0 {
+                                x1 as usize + output_dims.0
+                            } else {
+                                x1 as usize
+                            };
+                            if x0 < x1 { x0..x1 } else { x1..x0 }.collect()
+                        } else {
+                            unreachable!();
+                        };
+
+                        let outputs_y: Vec<_> = if let Ok(output_y) = coords[3].parse::<i32>() {
+                            vec![if output_y < 0 {
+                                output_y + output_dims.0 as i32
+                            } else {
+                                output_y
+                            } as usize]
+                        } else if let Some(caps) = MATCH_RANGE.captures(coords[3]) {
+                            let (y0, y1) = (
+                                caps.at(1).and_then(|s| i32::from_str(s).ok()).unwrap(),
+                                caps.at(2).and_then(|s| i32::from_str(s).ok()).unwrap(),
+                            );
+
+                            let y0 = if y0 < 0 {
+                                y0 as usize + output_dims.1
+                            } else {
+                                y0 as usize
                             };
 
-                        let outputs_y: Vec<_> =
-                            if let Ok(output_y) = coords[3].parse::<i32>() {
-                                vec![if output_y < 0 {
-                                    output_y + output_dims.0 as i32
-                                } else {
-                                    output_y
-                                } as usize]
-                            } else if let Some(caps) = MATCH_RANGE.captures(coords[3]) {
-                                let (y0, y1) =
-                                    (caps.at(1).and_then(|s| i32::from_str(s).ok()).unwrap(),
-                                     caps.at(2).and_then(|s| i32::from_str(s).ok()).unwrap());
-
-                                let y0 = if y0 < 0 {
-                                    y0 as usize + output_dims.1
-                                } else {
-                                    y0 as usize
-                                };
-
-                                let y1 = if y1 < 0 {
-                                    y1 as usize + output_dims.1
-                                } else {
-                                    y1 as usize
-                                };
-
-                                if y0 < y1 { y0..y1 } else { y1..y0 }.collect()
+                            let y1 = if y1 < 0 {
+                                y1 as usize + output_dims.1
                             } else {
-                                unreachable!();
+                                y1 as usize
                             };
+
+                            if y0 < y1 { y0..y1 } else { y1..y0 }.collect()
+                        } else {
+                            unreachable!();
+                        };
 
                         let mut constrained = Vec::new();
 
@@ -352,8 +360,8 @@ fn main() {
         pb.message("Building Wave object... ");
         pb.inc();
 
-        let mut wave = Wave::new(output_dims, periodic_output, &src)
-            .expect("Error constructing wave");
+        let mut wave =
+            Wave::new(output_dims, periodic_output, &src).expect("Error constructing wave");
 
         let mut pb = ProgressBar::new(constraints.len() as u64);
         pb.message("Propagating individual pixel constraints... ");
@@ -363,11 +371,13 @@ fn main() {
             wave = match wave.constrain(output_pos, img.get_pixel(x, y)) {
                 Some(wave) => wave,
                 None => {
-                    println!("Wave contradiction! The wave has failed to collapse due to a \
+                    println!(
+                        "Wave contradiction! The wave has failed to collapse due to a \
                               specified individual pixel constraint: output at {:?} == input at \
                               {:?}",
-                             output_pos,
-                             (x, y));
+                        output_pos,
+                        (x, y)
+                    );
                     return;
                 }
             };
@@ -383,9 +393,11 @@ fn main() {
             wave = match wave.observe() {
                 Some(wave) => wave,
                 None => {
-                    println!("Wave contradiction! The wave has failed to collapse, and no output \
+                    println!(
+                        "Wave contradiction! The wave has failed to collapse, and no output \
                               was generated. Please try again - maybe another seed will be \
-                              kinder to you.");
+                              kinder to you."
+                    );
                     return;
                 }
             };
@@ -396,9 +408,9 @@ fn main() {
         println!("The wave has fully collapsed! Saving result...");
 
         let pixels = wave.resolve();
-        let buffer = ImageBuffer::from_fn(pixels.dim().0 as u32,
-                                          pixels.dim().1 as u32,
-                                          |x, y| pixels[(x as usize, y as usize)]);
+        let buffer = ImageBuffer::from_fn(pixels.dim().0 as u32, pixels.dim().1 as u32, |x, y| {
+            pixels[(x as usize, y as usize)]
+        });
 
         buffer.save(output).expect("Error saving result");
     }

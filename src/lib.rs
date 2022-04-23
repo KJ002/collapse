@@ -8,12 +8,11 @@ extern crate log;
 #[macro_use]
 extern crate ndarray;
 extern crate pbr;
-extern crate vosealias;
 extern crate rand;
+extern crate vosealias;
 
 mod source;
 mod wave;
-
 
 pub use source::*;
 pub use wave::Wave;
