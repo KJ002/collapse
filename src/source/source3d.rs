@@ -3,18 +3,11 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::hash::Hash;
 use std::ops::{Neg, Sub};
 use std::vec::Vec;
-
 use bit_set::BitSet;
-
-use bit_vec::BitVec;
-
 use image::{GenericImage, Pixel};
-
 use ndarray::prelude::*;
 use ndarray::{Array3, ArrayView3, Ix3};
-
 use vosealias::AliasTable;
-
 use rand::Rng;
 
 use source::Source;
@@ -524,7 +517,7 @@ where
     }
 
     fn initial_state(&self, pos: Ix3) -> State<Ix3> {
-        let cfg = BitSet::from_bit_vec(BitVec::from_elem(self.samples.len(), true));
+        let cfg = BitSet::from_bytes(&vec![1; self.samples.len()]);
         let entropy = self.entropy(&cfg);
         State {
             pos: pos,

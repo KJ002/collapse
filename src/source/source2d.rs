@@ -3,11 +3,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::hash::Hash;
 use std::ops::{Neg, Sub};
 use std::vec::Vec;
-
 use bit_set::BitSet;
-
-use bit_vec::BitVec;
-
 use image::imageops::{flip_horizontal, flip_vertical, rotate180, rotate270, rotate90};
 use image::{GenericImage, ImageBuffer, Pixel};
 
@@ -534,7 +530,7 @@ where
     }
 
     fn initial_state(&self, pos: Ix2) -> State<Ix2> {
-        let cfg = BitSet::from_bit_vec(BitVec::from_elem(self.samples.len(), true));
+        let cfg = BitSet::from_bytes(&vec![1; self.samples.len()]);
         let entropy = self.entropy(&cfg);
         State {
             pos: pos,

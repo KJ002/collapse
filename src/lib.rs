@@ -1,7 +1,6 @@
 #[macro_use]
 extern crate bitflags;
 extern crate bit_set;
-extern crate bit_vec;
 extern crate image;
 #[macro_use]
 extern crate log;
